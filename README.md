@@ -14,3 +14,5 @@ npm run artifact
 
 The continuous integration workflow runs candidate code without network access.
 It accepts pull requests from a same-repository `agent/<run_id>` branch only.
+
+Validation canary: 2026-08-20.
