@@ -46,6 +46,7 @@ jobs:
           sudo -n useradd --system --no-create-home --shell /usr/sbin/nologin ring3-candidate
           sudo -n chown -R root:root control
           sudo -n chmod -R go-w control
+          sudo -n install -o root -g root -m 0555 control/.github/ring3/run-candidate.sh /usr/local/libexec/ring3-run-candidate
           sudo -n mv work /var/tmp/ring3-work
           sudo -n chown -R ring3-candidate:ring3-candidate /var/tmp/ring3-work
 
@@ -56,12 +57,11 @@ jobs:
           set -euo pipefail
           candidate_uid="$(id -u ring3-candidate)"
           candidate_gid="$(id -g ring3-candidate)"
-          control_script="${GITHUB_WORKSPACE}/control/.github/ring3/run-candidate.sh"
           sudo -n -u ring3-candidate mkdir -p .ring3-home
           sudo -n unshare --net --pid --fork --mount-proc \
             setpriv --reuid="${candidate_uid}" --regid="${candidate_gid}" --clear-groups \
             env -i HOME="${PWD}/.ring3-home" PATH="${PATH}" CI=true \
-            /bin/bash --noprofile --norc "${control_script}"
+            /bin/bash --noprofile --norc /usr/local/libexec/ring3-run-candidate
 
       - name: Validate the approved artifact
         run: node control/.github/ring3/validate-report.mjs /var/tmp/ring3-work/ring3-output/report.json
