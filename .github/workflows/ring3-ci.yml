@@ -1,7 +1,7 @@
 name: Ring 3 CI
 
 on:
-  pull_request:
+  pull_request_target:
     branches:
       - main
     types:
@@ -46,7 +46,28 @@ jobs:
           sudo -n useradd --system --no-create-home --shell /usr/sbin/nologin ring3-candidate
           sudo -n chown -R root:root control
           sudo -n chmod -R go-w control
-          sudo -n install -o root -g root -m 0555 control/.github/ring3/run-candidate.sh /usr/local/libexec/ring3-run-candidate
+          sudo -n tee /usr/local/libexec/ring3-run-candidate >/dev/null <<'RING3_CANDIDATE'
+          #!/bin/bash
+          set -euo pipefail
+          record_process() {
+            exit_status=$?
+            trap - EXIT
+            printf 'RING3_PROCESS|{"version":1,"pid":%d,"ppid":%d,"command":"npm run lint && npm test && npm run artifact","cwd":"/var/tmp/ring3-work","exitStatus":%d}\n' \
+              "$$" "${PPID}" "${exit_status}"
+            exit "${exit_status}"
+          }
+          trap record_process EXIT
+          [ "${PWD}" = "/var/tmp/ring3-work" ]
+          if timeout 5 curl --noproxy "*" --silent --show-error https://api.github.com >/dev/null 2>&1; then
+            echo "The candidate process reached the network." >&2
+            exit 1
+          fi
+          echo "network=denied"
+          npm run lint
+          npm test
+          npm run artifact
+          RING3_CANDIDATE
+          sudo -n chmod 0555 /usr/local/libexec/ring3-run-candidate
           sudo -n mv work /var/tmp/ring3-work
           sudo -n chown -R ring3-candidate:ring3-candidate /var/tmp/ring3-work
 
