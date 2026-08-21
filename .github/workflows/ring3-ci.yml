@@ -56,20 +56,12 @@ jobs:
           set -euo pipefail
           candidate_uid="$(id -u ring3-candidate)"
           candidate_gid="$(id -g ring3-candidate)"
+          control_script="${GITHUB_WORKSPACE}/control/.github/ring3/run-candidate.sh"
           sudo -n -u ring3-candidate mkdir -p .ring3-home
           sudo -n unshare --net --pid --fork --mount-proc \
             setpriv --reuid="${candidate_uid}" --regid="${candidate_gid}" --clear-groups \
             env -i HOME="${PWD}/.ring3-home" PATH="${PATH}" CI=true \
-            /bin/bash --noprofile --norc -euo pipefail -c '
-              if timeout 5 curl --noproxy "*" --silent --show-error https://api.github.com >/dev/null 2>&1; then
-                echo "The candidate process reached the network." >&2
-                exit 1
-              fi
-              echo "network=denied"
-              npm run lint
-              npm test
-              npm run artifact
-            '
+            /bin/bash --noprofile --norc "${control_script}"
 
       - name: Validate the approved artifact
         run: node control/.github/ring3/validate-report.mjs /var/tmp/ring3-work/ring3-output/report.json
