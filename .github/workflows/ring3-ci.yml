@@ -39,14 +39,25 @@ jobs:
           path: work
           persist-credentials: false
 
+      - name: Separate the candidate from the trusted control files
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo -n useradd --system --no-create-home --shell /usr/sbin/nologin ring3-candidate
+          sudo -n chown -R root:root control
+          sudo -n chmod -R go-w control
+          sudo -n chown -R ring3-candidate:ring3-candidate work
+
       - name: Run the fixed jobs without network access
         working-directory: work
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p .ring3-home
+          candidate_uid="$(id -u ring3-candidate)"
+          candidate_gid="$(id -g ring3-candidate)"
+          sudo -n -u ring3-candidate mkdir -p .ring3-home
           sudo -n unshare --net --pid --fork --mount-proc \
-            setpriv --reuid="$(id -u)" --regid="$(id -g)" --clear-groups \
+            setpriv --reuid="${candidate_uid}" --regid="${candidate_gid}" --clear-groups \
             env -i HOME="${PWD}/.ring3-home" PATH="${PATH}" CI=true \
             /bin/bash --noprofile --norc -euo pipefail -c '
               if timeout 5 curl --noproxy "*" --silent --show-error https://api.github.com >/dev/null 2>&1; then
