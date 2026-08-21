@@ -69,4 +69,4 @@ jobs:
           path: work/ring3-output/report.json
           if-no-files-found: error
           include-hidden-files: false
-          retention-days: 1
+          retention-days: 30
