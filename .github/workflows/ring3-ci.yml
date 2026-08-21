@@ -1,4 +1,5 @@
 name: Ring 3 CI
+run-name: Ring 3 CI ${{ github.event.pull_request.head.ref }} ${{ github.event.pull_request.head.sha }}
 
 on:
   pull_request_target:
