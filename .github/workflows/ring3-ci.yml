@@ -46,10 +46,11 @@ jobs:
           sudo -n useradd --system --no-create-home --shell /usr/sbin/nologin ring3-candidate
           sudo -n chown -R root:root control
           sudo -n chmod -R go-w control
-          sudo -n chown -R ring3-candidate:ring3-candidate work
+          sudo -n mv work /var/tmp/ring3-work
+          sudo -n chown -R ring3-candidate:ring3-candidate /var/tmp/ring3-work
 
       - name: Run the fixed jobs without network access
-        working-directory: work
+        working-directory: /var/tmp/ring3-work
         shell: bash
         run: |
           set -euo pipefail
@@ -71,13 +72,13 @@ jobs:
             '
 
       - name: Validate the approved artifact
-        run: node control/.github/ring3/validate-report.mjs work/ring3-output/report.json
+        run: node control/.github/ring3/validate-report.mjs /var/tmp/ring3-work/ring3-output/report.json
 
       - name: Upload the approved artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: ring3-report
-          path: work/ring3-output/report.json
+          path: /var/tmp/ring3-work/ring3-output/report.json
           if-no-files-found: error
           include-hidden-files: false
           retention-days: 30
