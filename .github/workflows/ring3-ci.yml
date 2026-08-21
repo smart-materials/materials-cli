@@ -1,0 +1,72 @@
+name: Ring 3 CI
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ring3-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      startsWith(github.head_ref, 'agent/')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out the trusted control files
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: control
+          persist-credentials: false
+
+      - name: Check out the candidate
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: work
+          persist-credentials: false
+
+      - name: Run the fixed jobs without network access
+        working-directory: work
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p .ring3-home
+          sudo -n unshare --net --pid --fork --mount-proc \
+            setpriv --reuid="$(id -u)" --regid="$(id -g)" --clear-groups \
+            env -i HOME="${PWD}/.ring3-home" PATH="${PATH}" CI=true \
+            /bin/bash --noprofile --norc -euo pipefail -c '
+              if timeout 5 curl --noproxy "*" --silent --show-error https://api.github.com >/dev/null 2>&1; then
+                echo "The candidate process reached the network." >&2
+                exit 1
+              fi
+              echo "network=denied"
+              npm run lint
+              npm test
+              npm run artifact
+            '
+
+      - name: Validate the approved artifact
+        run: node control/.github/ring3/validate-report.mjs work/ring3-output/report.json
+
+      - name: Upload the approved artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ring3-report
+          path: work/ring3-output/report.json
+          if-no-files-found: error
+          include-hidden-files: false
+          retention-days: 1

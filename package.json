@@ -1,0 +1,14 @@
+{
+  "name": "materials-cli",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "artifact": "node scripts/build-report.mjs --output ring3-output/report.json",
+    "lint": "node --check src/materials.mjs && node --check src/report.mjs && node --check scripts/build-report.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
