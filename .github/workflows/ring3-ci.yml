@@ -52,6 +52,18 @@ jobs:
         run: |
           sudo useradd --system --create-home --shell /usr/sbin/nologin ring3-candidate
           sudo chown -R ring3-candidate:ring3-candidate work
+          # The runner's file-command files (GITHUB_ENV, GITHUB_PATH, GITHUB_OUTPUT)
+          # live under RUNNER_TEMP, and GitHub leaves them world-writable so container
+          # steps can write them. The candidate step clears its own environment, but it
+          # could still list that directory and write NODE_OPTIONS or LD_PRELOAD into a
+          # command file; the later Validate and Upload steps run as `runner` and would
+          # execute it, which is runner-level code execution and forged CI evidence.
+          #
+          # The candidate runs as a different uid, so removing non-owner access to the
+          # directory denies it the path entirely: writing a file requires search on
+          # every parent, and `runner` keeps its own access. The candidate needs nothing
+          # under RUNNER_TEMP — it works in `work` with a cleared environment.
+          sudo chmod -R go-rwx "${RUNNER_TEMP}"
 
       - name: Run the fixed jobs without network access
         working-directory: work
