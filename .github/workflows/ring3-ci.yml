@@ -1,7 +1,16 @@
+# The Ring 3 CI workflow for smart-materials/materials-cli. This copy is the
+# reviewable source of truth: the manifest pins its sha256, the verifier compares
+# that digest against the workflow on the fixed repository's default branch, and
+# the upstream file must match this one byte for byte.
+#
+# pull_request_target runs THIS definition from the base branch, so a candidate
+# editing the workflow on its own branch changes nothing. The candidate process
+# runs as a dedicated unprivileged user inside network and pid namespaces, so it
+# cannot reach the network, the runner's credentials, or the control checkout.
 name: Ring 3 CI
 
 on:
-  pull_request:
+  pull_request_target:
     branches:
       - main
     types:
@@ -20,7 +29,7 @@ jobs:
   validate:
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository &&
-      startsWith(github.head_ref, 'agent/')
+      startsWith(github.event.pull_request.head.ref, 'agent/')
     runs-on: ubuntu-24.04
     timeout-minutes: 10
 
@@ -39,15 +48,19 @@ jobs:
           path: work
           persist-credentials: false
 
+      - name: Create the unprivileged candidate user
+        run: |
+          sudo useradd --system --create-home --shell /usr/sbin/nologin ring3-candidate
+          sudo chown -R ring3-candidate:ring3-candidate work
+
       - name: Run the fixed jobs without network access
         working-directory: work
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p .ring3-home
           sudo -n unshare --net --pid --fork --mount-proc \
-            setpriv --reuid="$(id -u)" --regid="$(id -g)" --clear-groups \
-            env -i HOME="${PWD}/.ring3-home" PATH="${PATH}" CI=true \
+            setpriv --reuid="$(id -u ring3-candidate)" --regid="$(id -g ring3-candidate)" --clear-groups \
+            env -i HOME=/home/ring3-candidate PATH="${PATH}" CI=true \
             /bin/bash --noprofile --norc -euo pipefail -c '
               if timeout 5 curl --noproxy "*" --silent --show-error https://api.github.com >/dev/null 2>&1; then
                 echo "The candidate process reached the network." >&2
