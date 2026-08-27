@@ -64,6 +64,16 @@ jobs:
           # every parent, and `runner` keeps its own access. The candidate needs nothing
           # under RUNNER_TEMP — it works in `work` with a cleared environment.
           sudo chmod -R go-rwx "${RUNNER_TEMP}"
+          # `/home/runner` is mode 750 runner:runner on the runner image, so a
+          # candidate outside the runner group cannot traverse it. Relative opens
+          # inside `work` survive that, but npm resolves an absolute path, so every
+          # candidate job failed with EACCES on work/package.json. Grant traversal to
+          # this one user, execute only, rather than widening the directory: `chmod
+          # o+x` would let any other local account reach the runner's home too. The
+          # mode stays 750, RUNNER_TEMP above stays owner-only, and the candidate
+          # still cannot list this directory — only pass through it to the work tree
+          # it owns.
+          sudo setfacl -m u:ring3-candidate:--x /home/runner
 
       - name: Run the fixed jobs without network access
         working-directory: work
