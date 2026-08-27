@@ -109,10 +109,18 @@ jobs:
 
       - name: Collect the approved artifact
         run: |
-          # The tree is candidate-owned and unreadable to `runner`, so root copies the
-          # report out. The copy is what the later steps read, so nothing that runs as
-          # `runner` opens a path the candidate can still write.
-          sudo install -o runner -g runner -m 644 /var/tmp/ring3-work/ring3-output/report.json report.json
+          # `runner` cannot traverse the candidate-owned 0700 tree, so the report must
+          # be read under another uid. It is read as the CANDIDATE, never as root.
+          #
+          # A root read here would be an arbitrary-read primitive. The candidate owns
+          # the directory, so it can leave report.json as a symlink to any
+          # root-readable host path; `install` and `cp` both dereference, so root would
+          # copy that file out and the later steps would validate and upload it.
+          # Reading as the candidate gives a planted symlink no power the candidate
+          # does not already hold — it can only reach what it may already read, and it
+          # could have written that content into the report directly. The redirect runs
+          # as `runner`, so the collected file is runner-owned with no chown needed.
+          sudo -n -u ring3-candidate /bin/cat /var/tmp/ring3-work/ring3-output/report.json > report.json
 
       - name: Validate the approved artifact
         run: node control/.github/ring3/validate-report.mjs report.json
